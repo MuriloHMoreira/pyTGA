@@ -3,6 +3,8 @@ import minimalmodbus
 import serial
 import signal
 import sys
+import os
+import subprocess
 import time
 import numpy as np
 import pandas as pd
@@ -12,133 +14,57 @@ import numpy as np
 from picosdk.usbtc08 import usbtc08 as tc08
 from picosdk.functions import assert_pico2000_ok
 
-name = 'Ensaio_teste10CACsemfibra1'
+for i in range(10):
+    print('\n')
+print('#' * 79)
+print('#' * 79)
+print('#' * 29, 'BEM-VINDO AO pyTGA!', '#' * 29)
+print('#' * 79)
+print('#' * 79)
+print('\n')
+print('#' * 33, 'INSTRUCOES:', '#' * 33)
+print('#' * 5, '1. Insira o nome do arquivo:')
+print('#' * 5, '2. Clique em Enter para começar o teste.')
+print('#' * 5, '3. Para abortar o teste, clique Ctrl+C.')
+print('\n')
+print('#' * 33, 'IMPORTANTE:', '#' * 33)
+print('#' * 15, 'Em caso de duvidas procure o Murilo ou o Tulio.', '#' * 15)
+print('#' * 79)
+print('\n')
 
 
-##################################################
-##################################################
-##################################################
-# Nao esquecer de salvar
-##################################################
-##################################################
-##################################################
-# Nao precisa editar nada abaixo
-##################################################
-##################################################
-##################################################
+name = input('##### Digite o nome do teste: ')
+file_path = './Vitória de Alencar/' + name + '.csv'
 
+
+resposta = 'SIM'
+if os.path.isfile(file_path):
+    print(f'##### OPA! O arquivo "{name}.csv" ja existe. Deseja sobrescrever?')
+    resposta = input('##### Digite "SIM" para sobrescrever: ')
+
+if resposta != 'SIM':
+    sys.exit()
+
+#os.system('python pyTGA_viewer.py')
+subprocess.Popen(f'python pyTGA_viewer.py {name}')
+
+run_flag = True
 
 def signal_handler(signal, frame):
     '''
     Function to close everything before stopping the test.
     '''
+    R_Start = 47
+    time.sleep(1)
+    safe_write(ctrl_ins, R_Start, 0, DEBUG=False, n_trials=15, SILENT=True)
     f.close()
-    print('Exiting Test!')
+    print('##### Ensaio Abortado! Dados salvos!')
+    print('##### Por favor, verifique se o controlador parou.')
+    global run_flag
+    run_flag = False
     sys.exit()
 
 signal.signal(signal.SIGINT, signal_handler)
-
-def run_test_T(name, total_time, t_sleep, ctrl_ins, PLOT=True, LOGGING=True):
-    '''
-    Function to run a test. It will start the data aquisition module which 
-    will run for a 'total_time' seconds. 
-    Parameters
-    ----------
-    name : string
-    The name of the test will be the name of the .csv file with the data of 
-    the test.
-
-    total_time: int, float
-    The total time that the data aquisition module will run.
-    
-    t_sleep: int, float
-    The time interveal between readings.
-    
-    scale_ser: serial.Serial
-    The serial object of the scale.
-    
-    ctrl_ins: minimalmodbus.Instrument
-    The instrument object of the controler.
-    
-    PLOT: bool
-    The flag for plotting.
-    
-    LOGGING: bool
-    The flag for logging the readings. Useful for debugging.
-
-    Returns
-    -------
-    The numpy arrays with the time
-    '''
-    def signal_handler(signal, frame):
-        '''
-        Function to close everything before stopping the test.
-        '''
-        f.close()
-        print('Exiting Test!')
-        sys.exit()
-    
-    signal.signal(signal.SIGINT, signal_handler)
-    print(f'Running Test: {name}')
-    print(f'Total Time: {total_time}')
-    f = open('./' + name + '.csv', 'w')
-    writer = csv.writer(f, delimiter='\t')
-    writer.writerow(['t_label', 't', 'T', 'SP'])
-    
-    TEMP_REGISTER = 1
-    SP_REGISTER = 25
-    if PLOT:
-        fig, axs = plt.subplots(1, 1, figsize=(9, 6))
-        plt.ion()
-        axs = [axs]
-        line1_T, = axs[0].plot(0, 0, '-o', c='navy', label='Thermocouple')
-        line2_SP, = axs[0].plot(0, 0, '-^', c='coral', label='Set Point')
-
-        axs[0].set_xlabel('Time [s]')
-        axs[0].set_ylabel('Temperature [°C]')
-        for ax in axs:
-            ax.grid()
-        plt.subplots_adjust(wspace=0.3)
-        plt.show()
-
-    T1_reads = []
-    SP_reads = []
-    t_labels = []
-    ts = []
-    t_0 = time.time()
-    t_end = time.time() + total_time
-    while time.time() < t_end:
-        try:
-            t = time.time() - t_0
-            t_label = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            T_data = ctrl_ins.read_register(TEMP_REGISTER)
-            plt.pause(t_sleep / 2)
-            SP_data = ctrl_ins.read_register(SP_REGISTER)
-            T1_reads.append(T_data)
-            SP_reads.append(SP_data)
-            t_labels.append(t_label)
-            ts.append(t)
-            writer.writerow([t_label, t, T_data, SP_data])
-            if LOGGING:
-                print(f't={round(t, 2)}s | T = {T_data} °C | SP = {SP_data}°C')
-        except:
-            if LOGGING:
-                print('Fail')
-            else:
-                pass
-        if PLOT:
-            line1_T.set_xdata(ts)
-            line1_T.set_ydata(T1_reads)
-            line2_SP.set_xdata(ts)
-            line2_SP.set_ydata(SP_reads)
-            fig.canvas.draw()
-            for ax in axs:
-                ax.relim()
-                ax.autoscale_view()
-        plt.pause(t_sleep / 2)
-    f.close()
-    print('That\'s all folks!')
-    return np.array(ts), np.array(T1_reads), np.array(SP_reads)
 
 PORT='COM1'
 #Set up ctrl_ins
@@ -181,7 +107,7 @@ def safe_read(instrument, register_address, n_trials=5, functioncode=3, DEBUG=Fa
     if not PRINT_ONLY:
         return register_value
 
-def safe_write(instrument, register_address, register_value, n_trials=5, functioncode=6, DEBUG=False):
+def safe_write(instrument, register_address, register_value, n_trials=5, functioncode=6, DEBUG=False, SILENT=False):
     WROTE = False
     i = 0
     if DEBUG:
@@ -195,7 +121,8 @@ def safe_write(instrument, register_address, register_value, n_trials=5, functio
                 print(f'Trial: {i+1}')
             instrument.write_register(register_address, register_value, functioncode=functioncode)
             WROTE = True
-            print('Valor Registrado:', safe_read(instrument, register_address))
+            if not SILENT:
+                print('Valor Registrado:', safe_read(instrument, register_address))
         except:
             if DEBUG:
                 print('Failed!')
@@ -270,7 +197,7 @@ R_SP_7 = 138
 
 # Run Program
 R_Start = 47
-safe_write(ctrl_ins, R_Start, 1)
+safe_write(ctrl_ins, R_Start, 1, SILENT=True)
 
 R_SP_i = 0
 R_PV_i = 1
@@ -320,14 +247,13 @@ overflow = ctypes.c_int16(0)
 units = tc08.USBTC08_UNITS["USBTC08_UNITS_CENTIGRADE"]
 
 t_total = (Pt_1 + Pt_2 + Pt_3) * 60
-print(f'Tempo total do ensaio: {t_total} s')
+print(f'##### Tempo total do ensaio: {t_total} s')
 
 # Print the values
 
-
-f = open('./Vitória de Alencar/' + name + '.csv', 'w')
-writer = csv.writer(f, delimiter='\t')
-writer.writerow(['t [s]', 'm [g]', 'Temp. Contr. [°C]', 'Temp. Prog. [°C]', 'Temp. Forno [°C]', 'Temp. Amos. [°C]'])
+f = open(file_path, 'w', newline='')
+writer = csv.writer(f, delimiter=',')
+writer.writerow(['t [s]', 'm [g]', 'Temp. Contr. [C]', 'Temp. Prog. [C]', 'Temp. Forno [C]', 'Temp. Amos. [C]'])
 
 
 PV_reads = []
@@ -339,7 +265,9 @@ ts = []
 
 
 t = 0
-while t < t_total:
+print(f'##### Começou!')
+print('\n')
+while (t < t_total) and (run_flag):
     try:
         t_0 = time.time()
 

@@ -2,25 +2,23 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import time
 import os
+import sys
+import signal
 
 # Caminho do arquivo CSV
-name = 'Ensaio_teste10CACsemfibra1'
-
-
-##################################################
-##################################################
-##################################################
-# Nao esquecer de salvar
-##################################################
-##################################################
-##################################################
-# Nao precisa editar nada abaixo
-##################################################
-##################################################
-##################################################
+name = sys.argv[1]
 
 
 csv_path = f"./Vitória de Alencar/{name}.csv"  # coloque o caminho correto aqui
+
+
+def signal_handler(signal, frame):
+    '''
+    Function to close everything before stopping the test.
+    '''
+    sys.exit()
+
+signal.signal(signal.SIGINT, signal_handler)
 
 # Configuração inicial do gráfico
 fig, ax1 = plt.subplots(figsize=(9, 6))
@@ -51,13 +49,13 @@ plt.show()
 # Função para ler o CSV de forma segura
 def read_csv_safe(path):
     try:
-        df = pd.read_csv(path,  delim_whitespace=True, encoding='ISO-8859-1', engine='python')
+        df = pd.read_csv(path, encoding='ISO-8859-1', engine='python')
         return df
     except:
         pass
 
 # Loop de atualização
-print("Iniciando leitura em tempo real do CSV...\n")
+print("##### Iniciando leitura em tempo real do CSV...\n")
 while True:
     df = read_csv_safe(csv_path)
     if df is not None and len(df) > 0:
@@ -70,7 +68,7 @@ while True:
             F_reads = df.iloc[:, 4]
             S_reads = df.iloc[:, 5]
         except Exception as e:
-            print("Erro ao processar colunas:", e)
+            print("##### Erro ao processar colunas:", e)
             time.sleep(1)
             continue
 
@@ -90,6 +88,6 @@ while True:
         fig.canvas.flush_events()
 
     else:
-        print("Aguardando dados no CSV...")
+        pass
 
     time.sleep(1)
